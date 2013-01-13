@@ -1,3 +1,3 @@
 #!
 
-less read-command.c
+sed tester.c
