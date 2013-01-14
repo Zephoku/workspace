@@ -22,6 +22,38 @@ typedef struct command_stream
   char** command_list;
 } command_stream;
 
+// Trim whitespace off commands
+  char* trim_whitespace(char* str)
+  {
+    char *end;
+    while(isspace(*str)) str++;
+    end = str + strlen(str) - 1;
+    while(end > str && isspace(*end)) end--;
+    *(end+1) = 0;
+    return str;
+  }
+int add_command(char*** list, int cur_size, char** cmd, int len)
+    {
+      if (*cmd == NULL || *list == NULL) 
+      {
+        return 0;
+      }
+      printf("cur_size: %d\n", cur_size);
+      printf("cmd: %s\n", *cmd);
+      // Append null byte
+      *cmd = (char*) realloc(*cmd, (len+1)*sizeof(char));
+      printf("HI\n");
+      (*cmd)[len] = '\0';
+      printf("HI\n");
+      // Add command to list
+      *list = (char**) realloc(*list, (cur_size+1)*sizeof(char**));
+      printf("HI\n");
+      (*list)[cur_size] = malloc(len);
+      printf("HI\n");
+      strcpy((*list)[cur_size], *cmd);
+      printf("HI\n");
+      return 1;
+    }
 command_stream_t
 make_command_stream (int (*get_next_byte) (void *),
 		     void *get_next_byte_argument)
@@ -33,11 +65,13 @@ make_command_stream (int (*get_next_byte) (void *),
   // initialize memory allocation
   // count of characters
   int pt_count = 0;
-  int str_count = 1;
+  //int str_count = 1;
+  int cmd_count = 0;
   int i = 0;
   char input_byte;
   char prev_byte;
-  char* stream = NULL;
+  char *tmp_ch = NULL;
+  //char* stream = NULL;
   command_stream t = { 0, 0, NULL };
   command_stream_t result_stream = &t;
   
@@ -51,82 +85,52 @@ make_command_stream (int (*get_next_byte) (void *),
   // Reallocate memory for stream characters
   // Record stream
   while (input_byte != EOF)
-  {
-    // cases for separate commands
-    if (input_byte == '(' || input_byte == ')' || input_byte == ';')
+  {    
+    if ((input_byte == '\n' || input_byte == ';' || input_byte == '(' || input_byte == ')'))
     {
-      stream = (char*) realloc(stream,2+str_count*sizeof(char));
-      stream[str_count-1] = '\n';
-      stream[str_count] = input_byte;
-      stream[str_count+1] = '\n';
-      str_count += 3;
+      // Add command
+      if (tmp_ch != NULL) 
+      {
+        add_command(&(result_stream->command_list), pt_count++, &tmp_ch, cmd_count);
+      printf("HI\n");
+      }
+      else
+      {
+        // Add operator
+        char* tmp = (char*) malloc(sizeof(char));
+        tmp[0] = input_byte;
+        add_command(&(result_stream->command_list), pt_count++, &tmp, 1);
+      }
+
+      printf("HI\n");
+      // Reset for next add
+      tmp_ch = NULL;
+      printf("HII\n");
+      cmd_count = 0;
+      prev_byte = input_byte;
+      printf("HII\n");
+      input_byte = get_next_byte(get_next_byte_argument);
+      printf("HII\n");
+      continue;
     }
-    else if ((prev_byte == '|' && input_byte == '|') ||
-             (prev_byte == '&' && input_byte == '&'))
-    {
-      stream = (char*) realloc(stream,3+str_count*sizeof(char));
-      stream[str_count-1] = '\n';
-      stream[str_count] = input_byte;
-      stream[str_count+1] = input_byte;
-      stream[str_count+2] = '\n';
-      str_count += 4;
-      input_byte = '&';
-    }
-    else if (prev_byte == '|' && input_byte != '|') 
-    {
-      stream = (char*) realloc(stream,3+str_count*sizeof(char));
-      stream[str_count-1] = '\n';
-      stream[str_count] = prev_byte;
-      stream[str_count+1] = input_byte;
-      stream[str_count+2] = '\n';
-      str_count += 4;
-    }
-    else if ((prev_byte != '|' && input_byte == '|') || 
-             (prev_byte != '&' && input_byte == '&'))
-    {
-    }
-    else
-    {
-      stream = (char*) realloc(stream,str_count*sizeof(char));
-      stream[str_count-1] = input_byte;
-      str_count += 1;
-    }
+    // Allocate for command until delimiter found
+    tmp_ch = (char*) realloc(tmp_ch, (cmd_count+1)*sizeof(char));
+    tmp_ch[cmd_count] = input_byte;
+    cmd_count++;
+
     prev_byte = input_byte;
     input_byte = get_next_byte(get_next_byte_argument);
   }
 
-
-  // Trim whitespace off commands
-  char* trim_whitespace(char* str)
-  {
-    char *end;
-    while(isspace(*str)) str++;
-    end = str + strlen(str) - 1;
-    while(end > str && isspace(*end)) end--;
-    *(end+1) = 0;
-    return str;
-  }
-
-  // Split up stream using delmiter
-  char* delim_stream = trim_whitespace(strtok(stream,"\n"));
-  while (delim_stream != NULL)
-  {
-    pt_count++;
-    result_stream->command_list = (char**) realloc(result_stream->command_list, 
-        pt_count*sizeof(char**));
-    result_stream->command_list[pt_count-1] = (char*) malloc(strlen(delim_stream));
-    result_stream->command_list[pt_count-1] = trim_whitespace(delim_stream);
-    delim_stream = trim(whitespace(strtok(NULL,"\n")));
-  }
   result_stream->size = pt_count;
 
   // Test print
   for (i=0; i < pt_count; i++)
   {
-    printf("%s \n", result_stream->command_list[i]);
+    printf("%d: %s\n", i, result_stream->command_list[i]);
   }
 
-   printf("pt_count: %d \n", pt_count);
+   printf("\npt_count: %d \n", pt_count);
   // Returns stream as character array
   return result_stream;
 }
